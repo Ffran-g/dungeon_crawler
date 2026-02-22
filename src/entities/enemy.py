@@ -95,6 +95,9 @@ class Enemy:
         self.defense_boost = 0
         self.status_effects: Dict[str, int] = {}
         
+        # Contador de stack del Brujo
+        self.warlock_stack = 0
+        
         # Boss specific
         self.boss_phase = 1
         self.max_phases = 3 if self.enemy_type == ENEMY_TYPE_BOSS else 1

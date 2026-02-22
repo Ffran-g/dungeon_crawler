@@ -157,15 +157,15 @@ class Cleric(CharacterClass):
             "warlock", "Brujo",
             BASE_STATS["warlock"],
             [
-                Skill("Maldición", "Aplica una maldición aleatoria al enemigo", effect="curse", hp_cost=8),
-                Skill("Explosión Maldita", "Daño basado en maldiciones del enemigo", damage_mult=1.0, effect="cursed_explosion", hp_cost=10),
-                Skill("Consumir Maldiciones", "Consume maldiciones del enemigo para obtener beneficios", effect="consume_curses", hp_cost=5),
-                Skill("Toque Vampírico", "Roba vida del enemigo", damage_mult=1.2, effect="life_steal"),
+                Skill("Maldición", "Aplica una maldición aleatoria al enemigo", damage_mult=1.2, effect="curse", hp_cost=5),
+                Skill("Explosión Maldita", "Daño basado en maldiciones del enemigo", damage_mult=1.5, effect="cursed_explosion", hp_cost=7),
+                Skill("Consumir Maldiciones", "Consume maldiciones del enemigo para obtener beneficios", effect="consume_curses", hp_cost=3),
+                Skill("Toque Vampírico", "Roba vida del enemigo", damage_mult=1.5, effect="life_steal", hp_cost=0),
             ],
             "Maestro de las artes oscuras. Usa su vida para lanzar hechizos.",
             passives=[
-                Passive("Toque Vampírico", "Restaura 2 HP al usar habilidad", "lifesteal_passive", value=2),
-                Passive("Coste Reducido", "-15% costo de habilidades", "skill_discount", value=15),
+                Passive("Toque Vampírico", "Restaura 5 HP al usar habilidad", "lifesteal_passive", value=5),
+                Passive("Coste Reducido", "-20% costo de habilidades", "skill_discount", value=20),
                 Passive("Resistencia Oscura", "+10% de reducción de daño cuando HP < 40%", "damage_reduction", value=10, trigger_threshold=40),
             ]
         )

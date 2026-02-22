@@ -10,6 +10,8 @@ class GameState(Enum):
     """Estados posibles del juego"""
     MAIN_MENU = auto()
     SELECT_CLASS = auto()
+    CLASS_INFO = auto()
+    SELECT_ENEMY_TYPE = auto()
     NEW_GAME = auto()
     DUNGEON = auto()
     COMBAT = auto()
@@ -24,6 +26,7 @@ class GameState(Enum):
     LOAD_GAME = auto()
     SAVE_GAME = auto()
     BOSS_INTRO = auto()
+    QUICK_COMBAT = auto()
 
 
 class StateMachine:
@@ -115,14 +118,17 @@ class StateMachine:
         Verifica si una transición es válida
         """
         valid_transitions = {
-            GameState.MAIN_MENU: [GameState.SELECT_CLASS, GameState.LOAD_GAME, GameState.SETTINGS],
-            GameState.SELECT_CLASS: [GameState.NEW_GAME, GameState.MAIN_MENU],
+            GameState.MAIN_MENU: [GameState.SELECT_CLASS, GameState.LOAD_GAME, GameState.SETTINGS, GameState.SELECT_ENEMY_TYPE],
+            GameState.SELECT_CLASS: [GameState.CLASS_INFO, GameState.MAIN_MENU],
+            GameState.CLASS_INFO: [GameState.NEW_GAME, GameState.QUICK_COMBAT, GameState.SELECT_CLASS, GameState.MAIN_MENU],
+            GameState.SELECT_ENEMY_TYPE: [GameState.QUICK_COMBAT, GameState.SELECT_CLASS, GameState.MAIN_MENU],
+            GameState.QUICK_COMBAT: [GameState.COMBAT, GameState.MAIN_MENU, GameState.DEFEAT, GameState.VICTORY],
             GameState.NEW_GAME: [GameState.DUNGEON],
             GameState.DUNGEON: [GameState.COMBAT, GameState.MERCHANT, GameState.EVENT, 
                                GameState.DUNGEON, GameState.PAUSE, GameState.VICTORY,
                                GameState.INVENTORY, GameState.EQUIPMENT, GameState.BOSS_INTRO],
             GameState.BOSS_INTRO: [GameState.COMBAT, GameState.DUNGEON],
-            GameState.COMBAT: [GameState.DUNGEON, GameState.VICTORY, GameState.DEFEAT],
+            GameState.COMBAT: [GameState.DUNGEON, GameState.VICTORY, GameState.DEFEAT, GameState.MAIN_MENU],
             GameState.MERCHANT: [GameState.DUNGEON, GameState.PAUSE],
             GameState.EVENT: [GameState.DUNGEON, GameState.PAUSE],
             GameState.INVENTORY: [GameState.DUNGEON, GameState.EQUIPMENT, GameState.PAUSE],
@@ -142,13 +148,16 @@ class StateMachine:
     def get_valid_transitions(self) -> list:
         """Retorna lista de transiciones válidas desde el estado actual"""
         valid_transitions = {
-            GameState.MAIN_MENU: [GameState.SELECT_CLASS, GameState.LOAD_GAME, GameState.SETTINGS],
-            GameState.SELECT_CLASS: [GameState.NEW_GAME, GameState.MAIN_MENU],
+            GameState.MAIN_MENU: [GameState.SELECT_CLASS, GameState.LOAD_GAME, GameState.SETTINGS, GameState.SELECT_ENEMY_TYPE],
+            GameState.SELECT_CLASS: [GameState.CLASS_INFO, GameState.MAIN_MENU],
+            GameState.CLASS_INFO: [GameState.NEW_GAME, GameState.QUICK_COMBAT, GameState.SELECT_CLASS, GameState.MAIN_MENU],
+            GameState.SELECT_ENEMY_TYPE: [GameState.QUICK_COMBAT, GameState.SELECT_CLASS, GameState.MAIN_MENU],
+            GameState.QUICK_COMBAT: [GameState.COMBAT, GameState.MAIN_MENU, GameState.DEFEAT, GameState.VICTORY],
             GameState.NEW_GAME: [GameState.DUNGEON],
             GameState.DUNGEON: [GameState.COMBAT, GameState.MERCHANT, GameState.EVENT,
                                GameState.PAUSE, GameState.VICTORY, GameState.INVENTORY, 
                                GameState.EQUIPMENT],
-            GameState.COMBAT: [GameState.DUNGEON, GameState.VICTORY, GameState.DEFEAT],
+            GameState.COMBAT: [GameState.DUNGEON, GameState.VICTORY, GameState.DEFEAT, GameState.MAIN_MENU],
             GameState.MERCHANT: [GameState.DUNGEON, GameState.PAUSE],
             GameState.EVENT: [GameState.DUNGEON, GameState.PAUSE],
             GameState.PAUSE: [GameState.DUNGEON, GameState.MAIN_MENU, GameState.SAVE_GAME],

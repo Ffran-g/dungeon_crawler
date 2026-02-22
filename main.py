@@ -61,6 +61,9 @@ class Game:
         self.merchant_items = []  # Items a la venta
         self.merchant_mode = "buy"  # "buy" o "sell"
         self.inventory_view = "inventory"  # "inventory" o "equipment"
+        self.selected_enemy_type = "basic"  # Tipo de enemigo para combate rápido
+        self.quick_combat_mode = False  # Indica si estamos en modo combate rápido
+        self.selected_class = "warrior"  # Clase seleccionada en el menú
         
         # Enemy turn delay
         self.enemy_turn_pending = False
@@ -133,6 +136,12 @@ class Game:
         elif state == GameState.SELECT_CLASS:
             self._handle_class_selection_input(key)
         
+        elif state == GameState.CLASS_INFO:
+            self._handle_class_info_input(key)
+        
+        elif state == GameState.SELECT_ENEMY_TYPE:
+            self._handle_enemy_type_selection_input(key)
+        
         elif state == GameState.NEW_GAME:
             self._handle_new_game_input(key)
         
@@ -164,6 +173,9 @@ class Game:
         
         elif state == GameState.BOSS_INTRO:
             self._handle_boss_intro_input(key)
+        
+        elif state == GameState.QUICK_COMBAT:
+            self._handle_quick_combat_input(key)
     
     def _handle_boss_intro_input(self, key: int):
         """Maneja entrada en la intro del boss"""
@@ -180,15 +192,17 @@ class Game:
     def _handle_main_menu_input(self, key: int):
         """Maneja entrada en menú principal"""
         if key == pygame.K_UP:
-            self.menu_selected = (self.menu_selected - 1) % 3
+            self.menu_selected = (self.menu_selected - 1) % 4
         elif key == pygame.K_DOWN:
-            self.menu_selected = (self.menu_selected + 1) % 3
+            self.menu_selected = (self.menu_selected + 1) % 4
         elif key == pygame.K_RETURN:
             if self.menu_selected == 0:
                 self.state_machine.change_state(GameState.SELECT_CLASS)
             elif self.menu_selected == 1:
-                self.state_machine.change_state(GameState.LOAD_GAME)
+                self.state_machine.change_state(GameState.SELECT_ENEMY_TYPE)
             elif self.menu_selected == 2:
+                self.state_machine.change_state(GameState.LOAD_GAME)
+            elif self.menu_selected == 3:
                 self.running = False
     
     def _handle_class_selection_input(self, key: int):
@@ -200,14 +214,61 @@ class Game:
         elif key == pygame.K_DOWN:
             self.menu_selected = (self.menu_selected + 1) % 4
         elif key == pygame.K_1 or (key == pygame.K_RETURN and self.menu_selected == 0):
-            self._start_new_game("warrior")
+            self.selected_class = "warrior"
+            self.state_machine.change_state(GameState.CLASS_INFO)
         elif key == pygame.K_2 or (key == pygame.K_RETURN and self.menu_selected == 1):
-            self._start_new_game("mage")
+            self.selected_class = "mage"
+            self.state_machine.change_state(GameState.CLASS_INFO)
         elif key == pygame.K_3 or (key == pygame.K_RETURN and self.menu_selected == 2):
-            self._start_new_game("rogue")
+            self.selected_class = "rogue"
+            self.state_machine.change_state(GameState.CLASS_INFO)
         elif key == pygame.K_4 or (key == pygame.K_RETURN and self.menu_selected == 3):
-            self._start_new_game("warlock")
+            self.selected_class = "warlock"
+            self.state_machine.change_state(GameState.CLASS_INFO)
         elif key == pygame.K_ESCAPE:
+            self.state_machine.change_state(GameState.MAIN_MENU)
+    
+    def _select_class_for_mode(self, class_id: str):
+        """Selecciona una clase y determina el modo (nueva partida o combate rápido)"""
+        prev_state = self.state_machine.get_previous_state()
+        
+        if prev_state == GameState.SELECT_ENEMY_TYPE:
+            self._start_quick_combat(class_id)
+        else:
+            self._start_new_game(class_id)
+    
+    def _handle_class_info_input(self, key: int):
+        """Maneja entrada en información de clase"""
+        if key == pygame.K_1:
+            self._start_new_game(self.selected_class)
+        elif key == pygame.K_2:
+            self.state_machine.change_state(GameState.SELECT_ENEMY_TYPE)
+        elif key == pygame.K_3:
+            self.state_machine.change_state(GameState.SELECT_CLASS)
+        elif key == pygame.K_ESCAPE:
+            self.state_machine.change_state(GameState.MAIN_MENU)
+    
+    def _handle_enemy_type_selection_input(self, key: int):
+        """Maneja entrada en selección de tipo de enemigo para combate rápido"""
+        if key == pygame.K_UP:
+            self.menu_selected = (self.menu_selected - 1) % 3
+        elif key == pygame.K_DOWN:
+            self.menu_selected = (self.menu_selected + 1) % 3
+        elif key == pygame.K_1 or (key == pygame.K_RETURN and self.menu_selected == 0):
+            self.selected_enemy_type = "basic"
+            self.state_machine.change_state(GameState.SELECT_CLASS)
+        elif key == pygame.K_2 or (key == pygame.K_RETURN and self.menu_selected == 1):
+            self.selected_enemy_type = "elite"
+            self.state_machine.change_state(GameState.SELECT_CLASS)
+        elif key == pygame.K_3 or (key == pygame.K_RETURN and self.menu_selected == 2):
+            self.selected_enemy_type = "boss"
+            self.state_machine.change_state(GameState.SELECT_CLASS)
+        elif key == pygame.K_ESCAPE:
+            self.state_machine.change_state(GameState.MAIN_MENU)
+    
+    def _handle_quick_combat_input(self, key: int):
+        """Maneja entrada en el estado de combate rápido"""
+        if key == pygame.K_ESCAPE:
             self.state_machine.change_state(GameState.MAIN_MENU)
     
     def _handle_new_game_input(self, key: int):
@@ -282,7 +343,11 @@ class Game:
                 if self.combat.victory:
                     self._handle_combat_victory()
                 else:
-                    self.state_machine.change_state(GameState.DEFEAT)
+                    if self.quick_combat_mode:
+                        self.quick_combat_mode = False
+                        self.state_machine.change_state(GameState.MAIN_MENU)
+                    else:
+                        self.state_machine.change_state(GameState.DEFEAT)
             return
         
         if not self.combat.player_turn:
@@ -331,16 +396,12 @@ class Game:
         if self.menu_selected == 2:
             if key == pygame.K_1:
                 self._use_item_combat(0)
-                self._end_player_turn()
             elif key == pygame.K_2:
                 self._use_item_combat(1)
-                self._end_player_turn()
             elif key == pygame.K_3:
                 self._use_item_combat(2)
-                self._end_player_turn()
             elif key == pygame.K_4:
                 self._use_item_combat(3)
-                self._end_player_turn()
         elif key == pygame.K_1:
             self._combat_action(0)
             self._end_player_turn()
@@ -490,13 +551,54 @@ class Game:
                         "name": skill.name,
                         "description": skill.description
                     })
+                passives_list = []
+                if hasattr(cls, 'passives') and cls.passives:
+                    for passive in cls.passives:
+                        passives_list.append({
+                            "name": passive.name,
+                            "description": passive.description
+                        })
                 class_info = {
                     "name": cls.name,
                     "description": cls.description,
                     "stats": cls.base_stats,
                     "skills": skills_list,
+                    "passives": passives_list,
                 }
             self.menu_renderer.draw_class_selection(self.menu_selected, class_info)
+        
+        elif state == GameState.CLASS_INFO:
+            selected_class = ["warrior", "mage", "rogue", "warlock"][self.menu_selected]
+            class_info = None
+            if selected_class in CLASSES:
+                cls = CLASSES[selected_class]
+                skills_list = []
+                for skill in cls.skills:
+                    skills_list.append({
+                        "name": skill.name,
+                        "description": skill.description
+                    })
+                passives_list = []
+                if hasattr(cls, 'passives') and cls.passives:
+                    for passive in cls.passives:
+                        passives_list.append({
+                            "name": passive.name,
+                            "description": passive.description
+                        })
+                class_info = {
+                    "name": cls.name,
+                    "description": cls.description,
+                    "stats": cls.base_stats,
+                    "skills": skills_list,
+                    "passives": passives_list,
+                }
+            self.menu_renderer.draw_class_info(selected_class, class_info)
+        
+        elif state == GameState.SELECT_ENEMY_TYPE:
+            self.menu_renderer.draw_enemy_type_selection(self.menu_selected)
+        
+        elif state == GameState.QUICK_COMBAT:
+            self._render_quick_combat()
         
         elif state == GameState.NEW_GAME:
             self.screen.fill((10, 10, 15))
@@ -559,6 +661,74 @@ class Game:
             self._render_boss_intro()
         
         pygame.display.flip()
+    
+    def _render_quick_combat(self):
+        """Renderiza la pantalla de combate rápido"""
+        self.screen.fill(COLOR_BLACK)
+        
+        center_x = SCREEN_WIDTH // 2
+        center_y = SCREEN_HEIGHT // 2
+        
+        if not self.combat:
+            return
+        
+        # Título del combate
+        turn_text = f"COMBATE RÁPIDO - Turno {self.combat.turn_count}"
+        if self.combat.player_turn:
+            turn_text += " - TU TURNO"
+        else:
+            turn_text += " - ENEMIGO"
+        
+        title_color = COLOR_GREEN if self.combat.player_turn else COLOR_RED
+        self.text_renderer.draw_title(turn_text, center_x, 25, title_color)
+        
+        # Jugador a la izquierda
+        self.ui_renderer.draw_player_stats(self.player, 15, 70)
+        
+        # Enemigos a la derecha
+        enemies = self.combat.get_alive_enemies()
+        if enemies:
+            enemy_panel_x = SCREEN_WIDTH - 310
+            for i, enemy in enumerate(enemies):
+                y_pos = 70 + i * 160
+                self.ui_renderer.draw_enemy_info(enemy, enemy_panel_x, y_pos)
+                
+                if i == self.combat.target_index:
+                    pygame.draw.rect(self.screen, COLOR_YELLOW, (enemy_panel_x - 5, y_pos - 5, 295, 150), 3)
+        
+        # Log de combate
+        log_x = center_x - 250
+        log_y = 330
+        messages = self.combat.log.get_recent_with_colors(6)
+        if messages:
+            self.ui_renderer.draw_combat_log(messages, log_x, log_y, 500, 140)
+        
+        # Menú de combate
+        if self.combat.player_turn and not self.combat.combat_over:
+            self.enemy_turn_pending = False
+            self.menu_renderer.draw_combat_menu(self.combat, self.menu_selected)
+        elif self.enemy_turn_pending and not self.combat.combat_over:
+            elapsed = pygame.time.get_ticks() - self.enemy_turn_start_time
+            remaining = max(0, (self.ENEMY_TURN_DELAY - elapsed) // 100)
+            
+            self.text_renderer.draw_title(f"Turno del enemigo en... {remaining}", center_x, 280, COLOR_RED)
+            
+            bar_w = 300
+            bar_h = 15
+            bar_x = center_x - bar_w // 2
+            bar_y = 310
+            progress = min(1.0, elapsed / self.ENEMY_TURN_DELAY)
+            pygame.draw.rect(self.screen, COLOR_DARK_GRAY, (bar_x, bar_y, bar_w, bar_h))
+            pygame.draw.rect(self.screen, COLOR_RED, (bar_x, bar_y, int(bar_w * progress), bar_h))
+            pygame.draw.rect(self.screen, COLOR_WHITE, (bar_x, bar_y, bar_w, bar_h), 2)
+        
+        # Mostrar resultado del combate
+        if self.combat.combat_over:
+            if self.combat.victory:
+                self.menu_renderer.draw_victory()
+            else:
+                self.text_renderer.draw_title("DERROTA", center_x, center_y, COLOR_RED)
+                self.text_renderer.draw_text("Presiona ENTER", center_x, center_y + 40, COLOR_GRAY, center=True)
     
     def _render_dungeon(self):
         """Renderiza la vista de la mazmorra"""
@@ -837,7 +1007,7 @@ class Game:
         # Log de combate - centrado abajo
         log_x = center_x - 250
         log_y = 330
-        messages = self.combat.log.get_recent(6)
+        messages = self.combat.log.get_recent_with_colors(6)
         if messages:
             self.ui_renderer.draw_combat_log(messages, log_x, log_y, 500, 140)
 
@@ -1031,6 +1201,189 @@ class Game:
         self.dungeon = Dungeon(difficulty=DIFFICULTY_NORMAL, player_class=player_class)
         self.state_machine.change_state(GameState.DUNGEON)
     
+    def _start_quick_combat(self, class_id: str):
+        """Inicia un combate rápido"""
+        from src.entities.enemy import ENEMY_TYPE_BASIC, ENEMY_TYPE_ELITE, ENEMY_TYPE_BOSS
+        
+        self.player = Player("Hero", class_id)
+        
+        self.player.inventory = []
+        self.player.equipment.weapon = None
+        self.player.equipment.armor = None
+        self.player.equipment.accessory_1 = None
+        self.player.equipment.accessory_2 = None
+        
+        health_potion = Item(
+            id="starter_health_potion",
+            name="Poción de Vida",
+            item_type=ITEM_TYPE_CONSUMABLE,
+            rarity=RARITY_COMMON,
+            description="Restaura 30 HP",
+            stats={"heal": 30},
+            value=20,
+            stackable=True,
+            max_stack=5,
+        )
+        
+        if class_id == "warrior":
+            weapon = Item(
+                id="starter_warrior_weapon",
+                name="Espada Oxidada",
+                item_type=ITEM_TYPE_WEAPON,
+                rarity=RARITY_COMMON,
+                description="Una espada vieja y oxidada",
+                stats={"atk": 3},
+                value=10,
+            )
+            armor = Item(
+                id="starter_warrior_armor",
+                name="Armadura de Cuero",
+                item_type=ITEM_TYPE_ARMOR,
+                rarity=RARITY_COMMON,
+                description="Armadura básica de cuero",
+                stats={"def": 2},
+                value=15,
+            )
+            self.player.equipment.weapon = weapon
+            self.player.equipment.armor = armor
+            self.player.add_item(health_potion)
+
+        elif class_id == "rogue":
+            weapon = Item(
+                id="starter_rogue_weapon",
+                name="Daga Oxidada",
+                item_type=ITEM_TYPE_WEAPON,
+                rarity=RARITY_COMMON,
+                description="Una daga vieja y mellada",
+                stats={"atk": 2},
+                value=8,
+            )
+            armor = Item(
+                id="starter_rogue_armor",
+                name="Túnica Raída",
+                item_type=ITEM_TYPE_ARMOR,
+                rarity=RARITY_COMMON,
+                description="Una túnica gastada",
+                stats={"def": 1},
+                value=10,
+            )
+            self.player.equipment.weapon = weapon
+            self.player.equipment.armor = armor
+            self.player.add_item(health_potion)
+
+        elif class_id == "mage":
+            weapon = Item(
+                id="starter_mage_weapon",
+                name="Bastón Viejo",
+                item_type=ITEM_TYPE_WEAPON,
+                rarity=RARITY_COMMON,
+                description="Un bastón gastado",
+                stats={"atk": 1},
+                value=5,
+            )
+            accessory = Item(
+                id="starter_mage_accessory",
+                name="Anillo Simple",
+                item_type=ITEM_TYPE_ACCESSORY,
+                rarity=RARITY_COMMON,
+                description="Un anillo insignificante",
+                stats={"atk": 1},
+                value=5,
+            )
+            self.player.equipment.weapon = weapon
+            self.player.equipment.accessory_1 = accessory
+
+            mana_potion = Item(
+                id="starter_mana_potion",
+                name="Poción de Mana",
+                item_type=ITEM_TYPE_CONSUMABLE,
+                rarity=RARITY_COMMON,
+                description="Restaura 25 Mana",
+                stats={"mana": 25},
+                value=25,
+                stackable=True,
+                max_stack=5,
+            )
+            self.player.add_item(health_potion)
+            self.player.add_item(mana_potion)
+
+        elif class_id == "warlock":
+            weapon = Item(
+                id="starter_warlock_weapon",
+                name="Daga Oxidada",
+                item_type=ITEM_TYPE_WEAPON,
+                rarity=RARITY_COMMON,
+                description="Una daga vieja y mellada",
+                stats={"atk": 2},
+                value=8,
+            )
+            accessory = Item(
+                id="starter_warlock_accessory",
+                name="Amuleto Básico",
+                item_type=ITEM_TYPE_ACCESSORY,
+                rarity=RARITY_COMMON,
+                description="Un amuleto simple",
+                stats={"atk": 1},
+                value=5,
+            )
+            self.player.equipment.weapon = weapon
+            self.player.equipment.accessory_1 = accessory
+
+            health_potion_2 = Item(
+                id="starter_health_potion_2",
+                name="Poción de Vida",
+                item_type=ITEM_TYPE_CONSUMABLE,
+                rarity=RARITY_COMMON,
+                description="Restaura 30 HP",
+                stats={"heal": 30},
+                value=20,
+                stackable=True,
+                max_stack=5,
+            )
+            self.player.add_item(health_potion)
+            self.player.add_item(health_potion_2)
+
+        self.player.update_stats_from_equipment()
+        
+        # Ajustar nivel según tipo de enemigo
+        if self.selected_enemy_type == "elite":
+            target_level = 10
+        elif self.selected_enemy_type == "boss":
+            target_level = 20
+        else:
+            target_level = 1
+        
+        # Subir de nivel hasta el objetivo
+        while self.player.level < target_level:
+            self.player.level += 1
+            self.player.xp_to_next_level = int(self.player.xp_to_next_level * 1.5)
+            self.player.max_hp += 10
+            self.player.current_hp = self.player.effective_max_hp
+            self.player.base_atk += 2
+            self.player.base_def += 1
+            self.player.max_mana += 5
+            self.player.current_mana = self.player.max_mana
+        
+        enemy_type_map = {
+            "basic": ENEMY_TYPE_BASIC,
+            "elite": ENEMY_TYPE_ELITE,
+            "boss": ENEMY_TYPE_BOSS,
+        }
+        
+        enemy_type = enemy_type_map.get(self.selected_enemy_type, ENEMY_TYPE_BASIC)
+        
+        floor = 1
+        if self.selected_enemy_type == "elite":
+            floor = 5
+        elif self.selected_enemy_type == "boss":
+            floor = 8
+        
+        enemies = EnemyFactory.create_enemy_by_type(enemy_type, floor, 1.0)
+        
+        self.quick_combat_mode = True
+        self._start_combat(enemies, can_flee=True)
+        self.state_machine.change_state(GameState.COMBAT)
+    
     def _enter_current_room(self):
         """Entra a la sala actual del jugador"""
         if not self.dungeon:
@@ -1122,9 +1475,7 @@ class Game:
         # Usar el objeto en combate
         result = self.combat.player_use_item(real_index)
         
-        if result.success:
-            self.combat.log.add(result.messages[0] if result.messages else "Objeto usado.")
-        else:
+        if not result.success:
             self.combat.log.add(result.messages[0] if result.messages else "No se pudo usar el objeto.")
     
     def _execute_enemy_turn_immediate(self):
@@ -1157,6 +1508,11 @@ class Game:
     
     def _handle_combat_victory(self):
         """Maneja victoria en combate"""
+        if self.quick_combat_mode:
+            self.quick_combat_mode = False
+            self.state_machine.change_state(GameState.VICTORY)
+            return
+        
         if not self.combat or not self.dungeon:
             self.state_machine.change_state(GameState.DUNGEON)
             return
@@ -1164,9 +1520,7 @@ class Game:
         self.game_stats["total_kills"] += 1
         self.dungeon.clear_current_room()
         
-        # Verificar si era el boss del piso 8
         if self.dungeon.current_floor == 8:
-            # Ir directamente a las escaleras de victoria
             self.state_machine.change_state(GameState.VICTORY)
             return
         

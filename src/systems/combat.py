@@ -38,21 +38,34 @@ class CombatAction:
 class CombatLog:
     """Registro de eventos del combate"""
     messages: List[str] = None
+    colors: List[tuple] = None
 
     def __post_init__(self):
         if self.messages is None:
             self.messages = []
+        if self.colors is None:
+            self.colors = []
 
-    def add(self, message: str):
-        """Añade un mensaje al log"""
+    def add(self, message: str, color: tuple = None):
+        """Añade un mensaje al log con color opcional"""
         self.messages.append(message)
-        # Mantener solo los últimos 50 mensajes
+        self.colors.append(color)
         if len(self.messages) > 50:
             self.messages = self.messages[-50:]
+            self.colors = self.colors[-50:]
 
     def get_recent(self, count: int = 10) -> List[str]:
         """Retorna los últimos n mensajes"""
         return self.messages[-count:]
+    
+    def get_recent_with_colors(self, count: int = 10) -> List[tuple]:
+        """Retorna los últimos n mensajes con sus colores"""
+        recent = []
+        msg_count = len(self.messages)
+        start = max(0, msg_count - count)
+        for i in range(start, msg_count):
+            recent.append((self.messages[i], self.colors[i]))
+        return recent
 
 
 class CombatSystem:
@@ -111,6 +124,11 @@ class CombatSystem:
         if self.enemies:
             # Verificar si el enemigo objetivo está muerto o si es None
             current_enemy = self.enemy if self.target_index < len(self.enemies) else None
+            
+            # Resetear stack del Brujo si el enemigo murió
+            if current_enemy and not current_enemy.is_alive():
+                current_enemy.warlock_stack = 0
+            
             if current_enemy is None or not current_enemy.is_alive():
                 alive = self.get_alive_enemies()
                 if alive:
@@ -141,7 +159,7 @@ class CombatSystem:
                 
                 # Verificar si el enemigo está aturdido
                 if hasattr(enemy, 'status_effects') and "stunned" in enemy.status_effects:
-                    self.log.add(f"El {enemy.name} está aturdido y no puede actuar!")
+                    self.log.add(f"El {enemy.name} está aturdido y no puede actuar!", COLOR_YELLOW)
                     enemy.status_effects["stunned"] -= 1
                     if enemy.status_effects["stunned"] <= 0:
                         del enemy.status_effects["stunned"]
@@ -150,7 +168,7 @@ class CombatSystem:
                 # Aplicar efectos de estado (veneno) al inicio del turno
                 messages = enemy.start_turn()
                 for msg in messages:
-                    self.log.add(msg)
+                    self.log.add(msg, COLOR_RED)
                 
                 # Verificar si murió por veneno
                 if not enemy.is_alive():
@@ -502,6 +520,25 @@ class CombatSystem:
         # Añadir mensajes al log
         self._add_messages_to_log(action)
 
+        # Mecánica única del Brujo: stack de maldiciones
+        if hasattr(self.player, 'class_id') and self.player.class_id == "warlock":
+            if self.enemy and self.enemy.is_alive():
+                self.enemy.warlock_stack += 1
+                
+                # Mostrar contador de stacks (cada 2 stacks)
+                if self.enemy.warlock_stack > 0 and self.enemy.warlock_stack < 5:
+                    if self.enemy.warlock_stack == 1 or self.enemy.warlock_stack == 3:
+                        action.messages.append(f"Maldición acumulada: {self.enemy.warlock_stack}/5")
+                
+                if self.enemy.warlock_stack >= 5:
+                    # Efecto extra: daño adicional + limpiar stack
+                    bonus_damage = int(self.player.attack * 1.0)
+                    actual_bonus = self.enemy.take_damage(bonus_damage)
+                    action.damage_dealt += actual_bonus
+                    action.messages.append(f"¡MALDICIÓN OSCURA! Daño extra de {actual_bonus}. ¡Efecto devastador!")
+                    self.log.add(f"¡MALDICIÓN OSCURA! Daño extra de {actual_bonus}.", COLOR_YELLOW)
+                    self.enemy.warlock_stack = 0  # Resetear contador
+
         # Verificar si el enemigo murió
         if not self.enemy.is_alive():
             self._handle_victory(action)
@@ -660,8 +697,9 @@ class CombatSystem:
 
         self.last_action = action
 
-        # Finalizar acción del jugador y procesar turno del enemigo
-        self._end_player_action()
+        # Los consumibles no terminan el turno del jugador
+        if item.item_type != ITEM_TYPE_CONSUMABLE:
+            self._end_player_action()
 
         return action
 
@@ -1020,10 +1058,18 @@ class CombatSystem:
         
         return bonus / 100.0 if bonus > 0 else 0.0
 
-    def _add_messages_to_log(self, action: CombatAction):
+    def _add_messages_to_log(self, action: CombatAction, color: tuple = None):
         """Añade los mensajes de una acción al log de combate"""
+        # Si no se especifica color, determinar automáticamente
+        if color is None:
+            # Si el target es el jugador, el enemigo está actuando (rojo)
+            if action.target == self.player and action.action_type != "item":
+                color = COLOR_RED
+            else:
+                color = COLOR_GREEN if action.action_type != "defend" else COLOR_CYAN
+        
         for msg in action.messages:
-            self.log.add(msg)
+            self.log.add(msg, color)
 
     def _check_all_enemies_dead(self) -> bool:
         """Verifica si todos los enemigos están muertos"""

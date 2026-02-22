@@ -450,28 +450,56 @@ class UIRenderer:
         
         # Recompensas
         self.tr.draw_text(f"Oro: {enemy.gold_reward} | XP: {enemy.xp_reward}", info_x, stats_y + 25, COLOR_YELLOW)
+        
+        # Stack del Brujo (debajo del panel)
+        if hasattr(enemy, 'warlock_stack') and enemy.warlock_stack > 0:
+            stack_y = y + 150
+            self.tr.draw_text("Maldición:", x + 10, stack_y, COLOR_MAGENTA)
+            for i in range(5):
+                x_pos = x + 90 + i * 18
+                if i < enemy.warlock_stack:
+                    self.tr.draw_text("X", x_pos, stack_y, COLOR_YELLOW)
+                else:
+                    self.tr.draw_text("X", x_pos, stack_y, COLOR_DARK_GRAY)
     
-    def draw_combat_log(self, messages: List[str], x: int, y: int, width: int, height: int):
+    def draw_combat_log(self, messages: List[tuple], x: int, y: int, width: int, height: int):
         """Dibuja el log de combate"""
         self.tr.draw_box(x, y, width, height)
         
         line_height = self.tr.font.get_height()
         start_y = y + UI_PADDING
         
-        for i, msg in enumerate(messages[-8:]):
-            if start_y + i * line_height < y + height - UI_PADDING:
+        # Si los mensajes son tuplas (msg, color), usarlos, si no usar lógica automática
+        use_custom_colors = messages and isinstance(messages[0], tuple)
+        
+        for i, msg_data in enumerate(messages[-8:]):
+            if start_y + i * line_height >= y + height - UI_PADDING:
+                break
+            
+            if use_custom_colors:
+                msg, custom_color = msg_data
+                color = custom_color if custom_color else COLOR_TEXT
+            else:
+                msg = msg_data
                 color = COLOR_TEXT
                 msg_lower = msg.lower()
-                if "crítico" in msg_lower or "¡" in msg:
-                    color = COLOR_YELLOW
-                elif "atacas" in msg_lower:
-                    color = COLOR_GREEN
-                elif "mueres" in msg_lower or "derrotado" in msg_lower or "game over" in msg_lower:
-                    color = COLOR_RED
-                elif "curas" in msg_lower or "victoria" in msg_lower:
-                    color = COLOR_GREEN
                 
-                self.tr.draw_text(msg, x + UI_PADDING, start_y + i * line_height, color)
+                if "te ataca" in msg_lower or "te hace" in msg_lower or "te inflige" in msg_lower or "golpea a" in msg_lower:
+                    color = COLOR_RED
+                elif "enemigo" in msg_lower or "goblin" in msg_lower or "esqueleto" in msg_lower or "dragón" in msg_lower or "orco" in msg_lower or "boss" in msg_lower or "jefe" in msg_lower:
+                    color = COLOR_ORANGE
+                elif "curas" in msg_lower or "bebes" in msg_lower or "restauras" in msg_lower or "te proteges" in msg_lower:
+                    color = COLOR_CYAN
+                elif "atacas" in msg_lower or "usaste" in msg_lower:
+                    color = COLOR_GREEN
+                elif "crítico" in msg_lower or "¡" in msg:
+                    color = COLOR_YELLOW
+                elif "mueres" in msg_lower or "derrotado" in msg_lower or "game over" in msg_lower or "has sido" in msg_lower:
+                    color = COLOR_RED
+                elif "victoria" in msg_lower:
+                    color = COLOR_YELLOW
+            
+            self.tr.draw_text(msg, x + UI_PADDING, start_y + i * line_height, color)
     
     def draw_dungeon_info(self, dungeon: Any, x: int, y: int):
         """Dibuja información de la mazmorra - Panel lateral derecho"""
@@ -666,13 +694,13 @@ class MenuRenderer:
         menu_w = 280
         
         # Opciones del menú
-        options = ["Nueva Partida", "Cargar Partida", "Salir"]
+        options = ["Nueva Partida", "Combate Rápido", "Cargar Partida", "Salir"]
         
         for i, option in enumerate(options):
             y_pos = menu_y + i * 60
             
             # Iconos para cada opción
-            icons = ["⚔", "📜", "✖"]
+            icons = ["⚔", "⚡", "📜", "✖"]
             
             # Fondo de selección
             if i == selected:
@@ -775,6 +803,146 @@ class MenuRenderer:
                     skill_y = info_y + 125 + (i // 2) * 18
                     skill_x = info_x + 30 + (i % 2) * 280
                     self.tr.draw_text(f"• {skill['name']}", skill_x, skill_y, COLOR_GRAY)
+        
+        self.tr.draw_text("[FLECHAS] Navegar  [ENTER] Seleccionar  [ESC] Volver", center_x, SCREEN_HEIGHT - 30, COLOR_GRAY, center=True)
+    
+    def draw_class_info(self, selected_class: str, class_info: Optional[Dict] = None):
+        """Dibuja información detallada de la clase seleccionada"""
+        self.screen.fill((10, 10, 15))
+        
+        center_x = SCREEN_WIDTH // 2
+        
+        # Título
+        self.tr.draw_title("CLASE SELECCIONADA", center_x, 30, COLOR_YELLOW)
+        
+        if not class_info:
+            return
+        
+        # Panel izquierdo - Stats
+        left_panel_w = 280
+        left_panel_h = 480
+        left_panel_x = 40
+        left_panel_y = 60
+        
+        self.tr.draw_box(left_panel_x, left_panel_y, left_panel_w, left_panel_h, COLOR_BORDER, (20, 20, 30))
+        
+        # Nombre
+        self.tr.draw_title(class_info.get("name", ""), left_panel_x + left_panel_w // 2, left_panel_y + 20, COLOR_YELLOW)
+        
+        # Descripción
+        self.tr.draw_text(class_info.get("description", ""), left_panel_x + 15, left_panel_y + 55, COLOR_GRAY)
+        
+        # Stats base
+        if "stats" in class_info:
+            stats = class_info["stats"]
+            self.tr.draw_text("ESTADÍSTICAS", left_panel_x + 15, left_panel_y + 100, COLOR_CYAN)
+            self.tr.draw_text(f"HP:  {stats.get('hp', 0)}", left_panel_x + 15, left_panel_y + 125, COLOR_WHITE)
+            self.tr.draw_text(f"ATQ: {stats.get('atk', 0)}", left_panel_x + 15, left_panel_y + 150, COLOR_WHITE)
+            self.tr.draw_text(f"DEF: {stats.get('def', 0)}", left_panel_x + 15, left_panel_y + 175, COLOR_WHITE)
+        
+        # Panel derecho - Habilidades
+        right_panel_w = 320
+        right_panel_h = 480
+        right_panel_x = SCREEN_WIDTH - right_panel_w - 40
+        right_panel_y = 60
+        
+        self.tr.draw_box(right_panel_x, right_panel_y, right_panel_w, right_panel_h, COLOR_BORDER, (20, 20, 30))
+        
+        # Habilidades
+        if "skills" in class_info:
+            self.tr.draw_text("HABILIDADES", right_panel_x + 15, right_panel_y + 20, COLOR_CYAN)
+            for i, skill in enumerate(class_info["skills"]):
+                skill_y = right_panel_y + 50 + i * 85
+                self.tr.draw_text(f"• {skill.get('name', '')}", right_panel_x + 15, skill_y, COLOR_YELLOW)
+                # Descripción en líneas
+                desc = skill.get('description', '')
+                if len(desc) > 35:
+                    desc = desc[:35] + "..."
+                self.tr.draw_text(desc, right_panel_x + 15, skill_y + 20, COLOR_GRAY)
+        
+        # Panel central - Pasivas
+        center_panel_w = 280
+        center_panel_h = 200
+        center_panel_x = left_panel_w + 60
+        center_panel_y = 60
+        
+        self.tr.draw_box(center_panel_x, center_panel_y, center_panel_w, center_panel_h, COLOR_BORDER, (20, 20, 30))
+        
+        if "passives" in class_info and class_info["passives"]:
+            self.tr.draw_text("HABILIDADES PASIVAS", center_panel_x + 15, center_panel_y + 20, COLOR_MAGENTA)
+            for i, passive in enumerate(class_info["passives"]):
+                passive_y = center_panel_y + 50 + i * 80
+                self.tr.draw_text(f"• {passive.get('name', '')}", center_panel_x + 15, passive_y, COLOR_YELLOW)
+                desc = passive.get('description', '')
+                if len(desc) > 30:
+                    desc = desc[:30] + "..."
+                self.tr.draw_text(desc, center_panel_x + 15, passive_y + 20, COLOR_GRAY)
+        
+        # Panel inferior - Opciones
+        opt_panel_w = 600
+        opt_panel_h = 80
+        opt_panel_x = (SCREEN_WIDTH - opt_panel_w) // 2
+        opt_panel_y = 560
+        
+        self.tr.draw_box(opt_panel_x, opt_panel_y, opt_panel_w, opt_panel_h, COLOR_BORDER, (20, 20, 30))
+        
+        self.tr.draw_text("ELIGE UNA OPCIÓN:", opt_panel_x + 30, opt_panel_y + 15, COLOR_YELLOW)
+        
+        options = ["[1] NUEVA PARTIDA", "[2] COMBATE RÁPIDO", "[3] VOLVER"]
+        for i, option in enumerate(options):
+            opt_x = opt_panel_x + 30 + i * 200
+            color = COLOR_GREEN if i == selected_class else COLOR_TEXT
+            self.tr.draw_text(option, opt_x, opt_panel_y + 45, color)
+        
+        # Controles
+        self.tr.draw_text("[1/2/3] Seleccionar  [ESC] Menú Principal", center_x, SCREEN_HEIGHT - 25, COLOR_GRAY, center=True)
+    
+    def draw_enemy_type_selection(self, selected: int = 0):
+        """Dibuja selección de tipo de enemigo para combate rápido"""
+        self.screen.fill((10, 10, 15))
+        
+        center_x = SCREEN_WIDTH // 2
+        
+        # Título
+        self.tr.draw_title("ELIGE TU OPONENTE", center_x, 60, COLOR_YELLOW)
+        
+        enemy_types = [
+            ("Normal", "Enemigos básicos del calabozo", COLOR_RED),
+            ("Élite", "Enemigos más fuertes y valiosos", COLOR_ORANGE),
+            ("Jefe", "El peligro máximo - Boss final", (148, 0, 211)),
+        ]
+        
+        card_w = 250
+        card_h = 130
+        spacing = 30
+        grid_w = card_w * 3 + spacing * 2
+        start_x = (SCREEN_WIDTH - grid_w) // 2
+        start_y = 120
+        
+        for i, (name, desc, color) in enumerate(enemy_types):
+            x_base = start_x + i * (card_w + spacing)
+            y_base = start_y
+            
+            # Fondo de selección
+            if i == selected:
+                self.tr.draw_box(x_base - 8, y_base - 8, card_w + 16, card_h + 16, COLOR_YELLOW, (30, 30, 45))
+            else:
+                self.tr.draw_box(x_base - 8, y_base - 8, card_w + 16, card_h + 16, COLOR_BORDER, (18, 18, 25))
+            
+            # Icono representativo
+            icon_x = x_base + card_w // 2
+            
+            if name == "Normal":
+                self.shape.draw_character(icon_x, y_base + 25, 40, color, is_player=False)
+            elif name == "Élite":
+                self.shape.draw_character(icon_x, y_base + 25, 40, color, is_player=False)
+            elif name == "Jefe":
+                self.shape.draw_skull(icon_x - 20, y_base + 25, 40)
+            
+            # Nombre
+            self.tr.draw_text(name, icon_x, y_base + 80, color, center=True)
+            # Descripción
+            self.tr.draw_text(desc, icon_x, y_base + 105, COLOR_GRAY, center=True)
         
         self.tr.draw_text("[FLECHAS] Navegar  [ENTER] Seleccionar  [ESC] Volver", center_x, SCREEN_HEIGHT - 30, COLOR_GRAY, center=True)
     
